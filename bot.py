@@ -59,13 +59,15 @@ async def card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["card"] = int(update.message.text)
 
     date_str = datetime.now().strftime("%d.%m.%Y")
-    summary = (
-        f"Спасибо!\n"
-        f"📅 Дата: {date_str}\n"
-        f"🎟 Билеты: {context.user_data['tickets']}\n"
-        f"💵 Наличные: {context.user_data['cash']} ₽\n"
-        f"💳 Безнал: {context.user_data['card']} ₽"
-    )
+    total = context.user_data["cash"] + context.user_data["card"]
+summary = (
+    f"Спасибо!\n"
+    f"📅 Дата: {date_str}\n"
+    f"🎟 Билеты: {context.user_data['tickets']}\n"
+    f"💵 Наличные: {context.user_data['cash']} ₽\n"
+    f"💳 Безнал: {context.user_data['card']} ₽\n"
+    f"🧾 Итого: {total} ₽"
+)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Отправить новый отчёт", callback_data="restart")]
