@@ -10,7 +10,9 @@ from telegram.ext import (
 )
 from datetime import datetime
 import os
-import time
+import asyncio
+import threading
+import socket
 
 # 🔧 Укажи свой Telegram user ID:
 ADMIN_ID = 166773394
@@ -64,21 +66,24 @@ async def card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎟 Билеты: {context.user_data['tickets']}\n"
         f"💵 Наличные: {context.user_data['cash']} ₽\n"
         f"💳 Безнал: {context.user_data['card']} ₽\n"
-        f"🧮 Итого: {total} ₽"
+        f"🧾 Итого: {total} ₽"
     )
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Отправить новый отчёт", callback_data="restart")]
     ])
 
+    # Финальный отчёт (не добавляем его в список на удаление!)
     await update.message.reply_text(summary, reply_markup=keyboard)
 
+    # Отправка админу
     if update.effective_user.id != ADMIN_ID:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=f"📥 Новый отчёт от @{update.effective_user.username or 'без username'}:\n\n{summary}"
         )
 
+    # Удаление промежуточных сообщений
     to_delete = context.user_data.get("to_delete", [])
     for msg_id in to_delete:
         try:
@@ -89,14 +94,25 @@ async def card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# Отмена по /cancel
+# Отмена
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Операция отменена.")
     context.user_data.clear()
     return ConversationHandler.END
 
-# Запуск приложения
+# 🔌 Заглушка порта для Render (обход требования Web Service)
+def keep_port_open():
+    port = int(os.environ.get("PORT", 10000))  # Render может задать PORT переменную
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('0.0.0.0', port))
+    s.listen(1)
+    while True:
+        conn, _ = s.accept()
+        conn.close()
+
 if __name__ == '__main__':
+    threading.Thread(target=keep_port_open, daemon=True).start()
+
     app = ApplicationBuilder().token(os.environ["TELEGRAM_TOKEN"]).build()
 
     conv_handler = ConversationHandler(
@@ -114,7 +130,3 @@ if __name__ == '__main__':
 
     app.add_handler(conv_handler)
     app.run_polling()
-
-    # 🔧 Заглушка, чтобы Render не требовал открытый порт
-    while True:
-        time.sleep(3600)
