@@ -1,4 +1,3 @@
-import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,9 +9,7 @@ from telegram.ext import (
     ConversationHandler,
 )
 from datetime import datetime
-import threading
-import http.server
-import socketserver
+import os
 
 # 🔧 Укажи свой Telegram user ID:
 ADMIN_ID = 166773394
@@ -24,6 +21,7 @@ TICKETS, CASH, CARD = range(3)
 async def restart_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    # Не удаляем итоговый отчёт!
     msg = await query.message.chat.send_message("Сколько билетов за смену?")
     context.user_data.setdefault("to_delete", []).append(msg.message_id)
     return TICKETS
@@ -60,27 +58,30 @@ async def card(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     date_str = datetime.now().strftime("%d.%m.%Y")
     total = context.user_data["cash"] + context.user_data["card"]
-summary = (
-    f"Спасибо!\n"
-    f"📅 Дата: {date_str}\n"
-    f"🎟 Билеты: {context.user_data['tickets']}\n"
-    f"💵 Наличные: {context.user_data['cash']} ₽\n"
-    f"💳 Безнал: {context.user_data['card']} ₽\n"
-    f"🧾 Итого: {total} ₽"
-)
+    summary = (
+        f"Спасибо!\n"
+        f"📅 Дата: {date_str}\n"
+        f"🎟 Билеты: {context.user_data['tickets']}\n"
+        f"💵 Наличные: {context.user_data['cash']} ₽\n"
+        f"💳 Безнал: {context.user_data['card']} ₽\n"
+        f"🧾 Итого: {total} ₽"
+    )
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("Отправить новый отчёт", callback_data="restart")]
     ])
 
+    # Финальный отчёт (не добавляем его в список на удаление!)
     await update.message.reply_text(summary, reply_markup=keyboard)
 
+    # Отправка админу
     if update.effective_user.id != ADMIN_ID:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=f"📥 Новый отчёт от @{update.effective_user.username or 'без username'}:\n\n{summary}"
         )
 
+    # Удаление промежуточных сообщений
     to_delete = context.user_data.get("to_delete", [])
     for msg_id in to_delete:
         try:
@@ -91,24 +92,14 @@ summary = (
     context.user_data.clear()
     return ConversationHandler.END
 
-# Отмена
+# Отмена по /cancel
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Операция отменена.")
     context.user_data.clear()
     return ConversationHandler.END
 
-# Заглушечный сервер для Render
-def run_dummy_server():
-    PORT = 10000
-    Handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        httpd.serve_forever()
-
-# Запуск
+# Запуск приложения
 if __name__ == '__main__':
-    # Стартуем заглушку в фоне
-    threading.Thread(target=run_dummy_server, daemon=True).start()
-
     app = ApplicationBuilder().token(os.environ["TELEGRAM_TOKEN"]).build()
 
     conv_handler = ConversationHandler(
