@@ -12,7 +12,8 @@ from datetime import datetime
 import os
 import asyncio
 import threading
-import socket
+import http.server
+import socketserver
 
 # 🔧 Укажи свой Telegram user ID:
 ADMIN_ID = 166773394
@@ -100,15 +101,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# 🔌 Заглушка порта для Render (обход требования Web Service)
+# 🔌 Заглушка порта для Render
 def keep_port_open():
-    port = int(os.environ.get("PORT", 10000))  # Render может задать PORT переменную
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('0.0.0.0', port))
-    s.listen(1)
-    while True:
-        conn, _ = s.accept()
-        conn.close()
+    port = int(os.environ.get("PORT", 10000))
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        httpd.serve_forever()
 
 if __name__ == '__main__':
     threading.Thread(target=keep_port_open, daemon=True).start()
