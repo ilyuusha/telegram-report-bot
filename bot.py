@@ -111,12 +111,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     return ConversationHandler.END
 
-# 🔌 Заглушка порта для Render
 def keep_port_open():
     port = int(os.environ.get("PORT", 10000))
-    handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        httpd.serve_forever()
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('0.0.0.0', port))
+    s.listen(1)
+    while True:
+        conn, _ = s.accept()
+        conn.close()
 
 if __name__ == '__main__':
     threading.Thread(target=keep_port_open, daemon=True).start()
@@ -129,9 +131,12 @@ if __name__ == '__main__':
             CallbackQueryHandler(restart_callback, pattern="^restart$")
         ],
         states={
-            TICKETS: [MessageHandler(filters.TEXT & ~filters.COMMAND, tickets)],
+            TICKETS_COMPANY: [MessageHandler(filters.TEXT & ~filters.COMMAND, tickets_company)],
             CASH: [MessageHandler(filters.TEXT & ~filters.COMMAND, cash)],
             CARD: [MessageHandler(filters.TEXT & ~filters.COMMAND, card)],
+            RETURNS_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, returns_count)],
+            RETURNS_SUM: [MessageHandler(filters.TEXT & ~filters.COMMAND, returns_sum)],
+            TOTAL_TICKETS: [MessageHandler(filters.TEXT & ~filters.COMMAND, total_tickets)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
